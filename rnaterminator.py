@@ -1,3 +1,5 @@
+import os.path
+
 from rnaterminator_libs.hybrid_annotator import HybridAnnotator
 from rnaterminator_libs.annotation_exporter import AnnotationExporter
 from rnaterminator_libs.annotations_merger import AnnotationsMerger
@@ -41,6 +43,7 @@ def main():
     parsed_wig_paths_df = parse_wig_paths(args.wigs_in)
     conditions_names = parsed_wig_paths_df["condition_name"].unique().tolist()
     output = {}
+    peaks_counts = {}
     for cond_name in conditions_names:
         cond_df = parsed_wig_paths_df[parsed_wig_paths_df["condition_name"] == cond_name]
         all_locs = pd.DataFrame()
@@ -56,11 +59,17 @@ def main():
                                                       args=(comb[0], comb[1], cond_name, refseq_paths, args)))
             wiggles_processed = [p.get() for p in processes]
             for wig in wiggles_processed:
-                all_locs = all_locs.append(wig, ignore_index=True)
+                all_locs = all_locs.append(wig[0], ignore_index=True)
+                peaks_counts.update(wig[1])
             all_locs.reset_index(inplace=True, drop=True)
             wig_pool.close()
         output[cond_name] = all_locs
+    peaks_counts_str = ""
+    for k, v in sum_peaks(peaks_counts).items():
+        peaks_counts_str += f"{k.replace('_', ' ')}\t{v}\n"
     # Export
+    with open(f"{os.path.dirname(args.gff_out)}/stats.csv", "w") as f:
+        f.write(peaks_counts_str)
     all_cond_data = pd.DataFrame()
     all_cond_names = "_".join(output.keys())
     for k, v in output.items():
@@ -79,9 +88,20 @@ def main():
 def process_single_wiggle(up_wig_path, down_wig_path, cond_name, refseq_paths, args):
     peak_annotator_obj = HybridAnnotator(up_wig_path=up_wig_path, down_wig_path=down_wig_path,
                                          cond_name=cond_name, refseq_paths=refseq_paths, args=args)
-    peaks_df = peak_annotator_obj.predict()
-    return peaks_df
+    peaks_df, peaks_counts = peak_annotator_obj.predict()
+    return peaks_df, peaks_counts
 
+
+def sum_peaks(in_dict):
+    out_dict = {}
+    keys = set([x.replace("_forward", "").replace("_reverse", "") for x in in_dict.keys()])
+    for k in keys:
+        if k not in out_dict.keys():
+            out_dict[k] = 0
+        for i in in_dict.keys():
+            if k in i:
+                out_dict[k] += in_dict[i]
+    return out_dict
 
 def parse_wig_paths(wigs_paths):
     wig_info = [x.split(":") for x in wigs_paths]

@@ -31,11 +31,12 @@ class HybridAnnotator:
 
     def predict(self):
         out_df = pd.DataFrame()
+        peaks_counts = {f"rising_{self.upstream_lib}": 0, f"falling_{self.downstream_lib}": 0}
+        rising_peaks, falling_peaks = 0, 0
         for seqid_key in self.arr_dict.keys():
             # Generate location
-            tmp_df = self.generate_locs(self.arr_dict[seqid_key],
-                                        True if self.wig_orient == "r" else False,
-                                        self.cond_name)
+            tmp_df, r_peaks, f_peaks =\
+                self.generate_locs(self.arr_dict[seqid_key], True if self.wig_orient == "r" else False, self.cond_name)
             print(f"\tPossible {tmp_df.shape[0]} positions for {self.cond_name} {self.wig_orient}")
             # Group overlaps and filter
             tmp_df = self.drop_overlaps(tmp_df, True if self.wig_orient == "r" else False)
@@ -43,8 +44,11 @@ class HybridAnnotator:
             # append
             tmp_df["seqid"] = seqid_key
             out_df = out_df.append(tmp_df, ignore_index=True)
+            peaks_counts[f"rising_{self.upstream_lib}"] += r_peaks
+            peaks_counts[f"falling_{self.downstream_lib}"] += f_peaks
+
         out_df.reset_index(inplace=True, drop=True)
-        return out_df
+        return out_df, peaks_counts
 
     def generate_locs(self, coverage_array, is_reversed, cond_name):
         print(f"Generating all possible locations for: {cond_name}")
@@ -60,10 +64,12 @@ class HybridAnnotator:
                                                       height=(None, None),
                                                       prominence=(None, None),
                                                       distance=self.args.peak_distance)
+
         falling_peaks, falling_peaks_props = find_peaks(coverage_array[:, falling_col],
                                                         height=(None, None),
                                                         prominence=(None, None),
                                                         distance=self.args.peak_distance)
+
         rp_index_func = lambda x: np.where(rising_peaks == x)
         fp_index_func = lambda x: np.where(falling_peaks == x)
         ## Ignore low coverage
@@ -114,7 +120,7 @@ class HybridAnnotator:
         possible_locs_df["start"] = possible_locs_df["start"].astype(int)
         possible_locs_df["end"] = possible_locs_df["end"].astype(int)
         possible_locs_df["position_length"] = possible_locs_df["position_length"].astype(int)
-        return self.drop_redundant_positions(possible_locs_df, is_reversed)
+        return self.drop_redundant_positions(possible_locs_df, is_reversed), rising_peaks.shape[0], falling_peaks.shape[0]
 
     def drop_redundant_positions(self, df, is_reversed):
         sort_key = "end"
