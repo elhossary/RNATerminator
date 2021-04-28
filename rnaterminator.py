@@ -15,7 +15,7 @@ def main():
     parser.add_argument("--refseqs_in", required=True, type=str, nargs="+",
                         help="Fasta files for the reference sequence (space separated)")
     parser.add_argument("--wigs_in", required=True, type=str, nargs="+",
-                        help="Wiggle files (space separated), format path:cond:up/down:forward/reverse")
+                        help="Wiggle files (space separated), format path:cond:upstream/downstream:+/-")
     parser.add_argument("--min_len", default=50, type=int,
                         help="Minimum allowed annotation length")
     parser.add_argument("--max_len", default=350, type=int,
@@ -44,7 +44,7 @@ def main():
     for cond_name in conditions_names:
         cond_df = parsed_wig_paths_df[parsed_wig_paths_df["condition_name"] == cond_name]
         all_locs = pd.DataFrame()
-        for orient in ["forward", "reverse"]:
+        for orient in ["+", "-"]:
             cond_orient_df = cond_df[cond_df["orientation"] == orient]
             up_wigs = cond_orient_df[cond_orient_df["wig_type"] == "upstream"]["path"].tolist()
             down_wigs = cond_orient_df[cond_orient_df["wig_type"] == "downstream"]["path"].tolist()
