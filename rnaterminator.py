@@ -72,6 +72,7 @@ def main():
         # all conditions merged
         all_cond_data = all_cond_data.append(v, ignore_index=True)
     all_cond_data.reset_index(inplace=True, drop=True)
+    all_cond_data = AnnotationsMerger(all_cond_data, args).merge()
     AnnotationExporter(all_cond_data, args).export(prefix=all_cond_names)
 
 
