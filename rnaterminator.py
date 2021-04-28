@@ -64,7 +64,7 @@ def main():
             all_locs.reset_index(inplace=True, drop=True)
             wig_pool.close()
         output[cond_name] = all_locs
-    peaks_counts_str = ""
+    peaks_counts_str = "Lib\tPeak count\n"
     for k, v in sum_peaks(peaks_counts).items():
         peaks_counts_str += f"{k.replace('_', ' ')}\t{v}\n"
     # Export

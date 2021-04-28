@@ -32,7 +32,6 @@ class HybridAnnotator:
     def predict(self):
         out_df = pd.DataFrame()
         peaks_counts = {f"rising_{self.upstream_lib}": 0, f"falling_{self.downstream_lib}": 0}
-        rising_peaks, falling_peaks = 0, 0
         for seqid_key in self.arr_dict.keys():
             # Generate location
             tmp_df, r_peaks, f_peaks =\
