@@ -1,6 +1,6 @@
 from rnaterminator_libs.hybrid_annotator import HybridAnnotator
 from rnaterminator_libs.annotation_exporter import AnnotationExporter
-from rnaterminator_libs.annotations_merger import ConditionsMerger
+from rnaterminator_libs.annotations_merger import AnnotationsMerger
 import logging as logger
 import argparse
 import glob
@@ -30,10 +30,6 @@ def main():
                         help="Ignore coverage up to")
     parser.add_argument("--annotation_type", required=True, type=str,
                         help="Specify a name for the annotation type")
-    parser.add_argument("--Unmerge_replicates", default=False, action='store_true',
-                        help="Stop mergeing overlapping annotations from replicates")
-    parser.add_argument("--merge_conditions", default=False, action='store_true',
-                        help="Merges overlapping annotations from different conditions")
     parser.add_argument("--gff_out", required=True, type=str, help="Path to output GFF file")
     args = parser.parse_args()
     logger.info("Getting list of files")
@@ -44,6 +40,7 @@ def main():
 
     parsed_wig_paths_df = parse_wig_paths(args.wigs_in)
     conditions_names = parsed_wig_paths_df["condition_name"].unique().tolist()
+    output = {}
     for cond_name in conditions_names:
         cond_df = parsed_wig_paths_df[parsed_wig_paths_df["condition_name"] == cond_name]
         all_locs = pd.DataFrame()
@@ -62,10 +59,21 @@ def main():
                 all_locs = all_locs.append(wig, ignore_index=True)
             all_locs.reset_index(inplace=True, drop=True)
             wig_pool.close()
+        output[cond_name] = all_locs
+    # Export
+    all_cond_data = pd.DataFrame()
+    all_cond_names = "_".join(output.keys())
+    for k, v in output.items():
+        # Replicates unmerged
+        AnnotationExporter(v, args).export(prefix=f"unmerged_{k}")
+        # Replicates merged
+        cond_merged_locs = AnnotationsMerger(v, args).merge()
+        AnnotationExporter(cond_merged_locs, args).export(prefix=f"{k}")
+        # all conditions merged
+        all_cond = all_cond_data.append(v, ignore_index=True)
+        all_cond.reset_index(inplace=True, drop=True)
+    AnnotationExporter(all_cond_data, args).export(prefix=all_cond_names)
 
-        cond_merged_locs = ConditionsMerger(all_locs, args).merge_replicates()
-        print(cond_merged_locs.to_string())
-        AnnotationExporter(cond_merged_locs, args).export(prefix=cond_name)
 
 
 def process_single_wiggle(up_wig_path, down_wig_path, cond_name, refseq_paths, args):

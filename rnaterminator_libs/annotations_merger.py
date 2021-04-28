@@ -4,7 +4,7 @@ from itertools import product
 from io import StringIO
 
 
-class ConditionsMerger:
+class AnnotationsMerger:
 
     def __init__(self, df, args):
         self.df = df
