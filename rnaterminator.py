@@ -70,10 +70,9 @@ def main():
         cond_merged_locs = AnnotationsMerger(v, args).merge()
         AnnotationExporter(cond_merged_locs, args).export(prefix=f"{k}")
         # all conditions merged
-        all_cond = all_cond_data.append(v, ignore_index=True)
-        all_cond.reset_index(inplace=True, drop=True)
+        all_cond_data = all_cond_data.append(v, ignore_index=True)
+    all_cond_data.reset_index(inplace=True, drop=True)
     AnnotationExporter(all_cond_data, args).export(prefix=all_cond_names)
-
 
 
 def process_single_wiggle(up_wig_path, down_wig_path, cond_name, refseq_paths, args):
