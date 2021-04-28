@@ -36,10 +36,10 @@ class HybridAnnotator:
             tmp_df = self.generate_locs(self.arr_dict[seqid_key],
                                         True if self.wig_orient == "r" else False,
                                         self.cond_name)
-            print(f"\tPossible {tmp_df.shape[0]} positions for {self.cond_name}")
+            print(f"\tPossible {tmp_df.shape[0]} positions for {self.cond_name} {self.wig_orient}")
             # Group overlaps and filter
             tmp_df = self.drop_overlaps(tmp_df, True if self.wig_orient == "r" else False)
-            print(f"\t{tmp_df.shape[0]} valid positions for {self.cond_name}")
+            print(f"\t{tmp_df.shape[0]} valid positions for {self.cond_name} {self.wig_orient}")
             # append
             tmp_df["seqid"] = seqid_key
             out_df = out_df.append(tmp_df, ignore_index=True)

@@ -76,7 +76,8 @@ def main():
 
 
 def process_single_wiggle(up_wig_path, down_wig_path, cond_name, refseq_paths, args):
-    peak_annotator_obj = HybridAnnotator(up_wig_path=up_wig_path, down_wig_path=down_wig_path, cond_name=cond_name, refseq_paths=refseq_paths, args=args)
+    peak_annotator_obj = HybridAnnotator(up_wig_path=up_wig_path, down_wig_path=down_wig_path,
+                                         cond_name=cond_name, refseq_paths=refseq_paths, args=args)
     peaks_df = peak_annotator_obj.predict()
     return peaks_df
 
