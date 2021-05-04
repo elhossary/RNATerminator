@@ -35,7 +35,9 @@ class HybridAnnotator:
         for seqid_key in self.arr_dict.keys():
             # Generate location
             tmp_df, r_peaks, f_peaks =\
-                self.generate_locs(self.arr_dict[seqid_key], True if self.wig_orient == "r" else False, self.cond_name)
+                self.generate_locs(self.arr_dict[seqid_key],
+                                   True if self.wig_orient == "r" else False,
+                                   self.cond_name, seqid_key)
             print(f"\tPossible {tmp_df.shape[0]} positions for {self.cond_name} {self.wig_orient}")
             # Group overlaps and filter
             tmp_df = self.drop_overlaps(tmp_df, True if self.wig_orient == "r" else False)
@@ -49,8 +51,8 @@ class HybridAnnotator:
         out_df.reset_index(inplace=True, drop=True)
         return out_df, peaks_counts
 
-    def generate_locs(self, coverage_array, is_reversed, cond_name):
-        print(f"Generating all possible locations for: {cond_name}")
+    def generate_locs(self, coverage_array, is_reversed, cond_name, seqid):
+        print(f"Generating all possible locations for: {cond_name} {'-' if is_reversed else '+'} {seqid}")
         if is_reversed:
             coverage_array = np.flipud(coverage_array)
         location_col = 0
@@ -106,16 +108,23 @@ class HybridAnnotator:
                 upper_loc, lower_loc = lower_loc, upper_loc
                 fp_height, rp_height = rp_height, fp_height
             pos_len = upper_loc - lower_loc + 1
-            possible_locs.append([lower_loc, upper_loc, strand, pos_len,
-                                  self.upstream_lib, self.downstream_lib, cond_name,
-                                  rp_height, fp_height])
-        possible_locs_df = pd.DataFrame(data=possible_locs, columns=['start', 'end', 'strand', "position_length",
-                                                                     "upstream_lib", "downstream_lib", "condition_name",
-                                                                     "start_peak_height", "end_peak_height"])
+            possible_locs.append({'start': lower_loc,
+                                  'end': upper_loc,
+                                  'strand': strand,
+                                  "position_length": pos_len,
+                                  "upstream_lib": self.upstream_lib,
+                                  "downstream_lib": self.downstream_lib,
+                                  "condition_name": cond_name,
+                                  "start_peak_height": rp_height,
+                                  "end_peak_height": fp_height})
+        possible_locs_df = pd.DataFrame(data=possible_locs)
+        if possible_locs_df.empty:
+            return self.drop_redundant_positions(possible_locs_df, is_reversed), \
+                   rising_peaks.shape[0], falling_peaks.shape[0]
         possible_locs_df["start"] = possible_locs_df["start"].astype(int)
         possible_locs_df["end"] = possible_locs_df["end"].astype(int)
         possible_locs_df["position_length"] = possible_locs_df["position_length"].astype(int)
-        return self.drop_redundant_positions(possible_locs_df, is_reversed),\
+        return self.drop_redundant_positions(possible_locs_df, is_reversed), \
                rising_peaks.shape[0], falling_peaks.shape[0]
 
     def drop_redundant_positions(self, df, is_reversed):
