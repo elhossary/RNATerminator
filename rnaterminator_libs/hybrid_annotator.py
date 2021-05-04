@@ -52,7 +52,7 @@ class HybridAnnotator:
         return out_df, peaks_counts
 
     def generate_locs(self, coverage_array, is_reversed, cond_name, seqid):
-        print(f"Generating all possible locations for: {cond_name} {'-' if is_reversed else '+'} {seqid}")
+        print(f"Generating all possible locations for: {cond_name} {seqid}{'R' if is_reversed else 'F'} ")
         if is_reversed:
             coverage_array = np.flipud(coverage_array)
         location_col = 0
