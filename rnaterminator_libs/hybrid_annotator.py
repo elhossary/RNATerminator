@@ -106,16 +106,12 @@ class HybridAnnotator:
                 upper_loc, lower_loc = lower_loc, upper_loc
                 fp_height, rp_height = rp_height, fp_height
             pos_len = upper_loc - lower_loc + 1
-            possible_locs.append({'start': lower_loc,
-                                  'end': upper_loc,
-                                  'strand': strand,
-                                  "position_length": pos_len,
-                                  "upstream_lib": self.upstream_lib,
-                                  "downstream_lib": self.downstream_lib,
-                                  "condition_name": cond_name,
-                                  "start_peak_height": rp_height,
-                                  "end_peak_height": fp_height})
-        possible_locs_df = pd.DataFrame(data=possible_locs)
+            possible_locs.append([lower_loc, upper_loc, strand, pos_len,
+                                  self.upstream_lib, self.downstream_lib, cond_name,
+                                  rp_height, fp_height])
+        possible_locs_df = pd.DataFrame(data=possible_locs, columns=['start', 'end', 'strand', "position_length",
+                                                                     "upstream_lib", "downstream_lib", "condition_name",
+                                                                     "start_peak_height", "end_peak_height"])
         if possible_locs_df.empty:
             return self.drop_redundant_positions(possible_locs_df, is_reversed),\
                    rising_peaks.shape[0], falling_peaks.shape[0]
