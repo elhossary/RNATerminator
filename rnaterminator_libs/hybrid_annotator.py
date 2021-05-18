@@ -38,6 +38,10 @@ class HybridAnnotator:
                 self.generate_locs(self.arr_dict[seqid_key],
                                    True if self.wig_orient == "r" else False,
                                    self.cond_name, seqid_key)
+            peaks_counts[f"rising_{self.upstream_lib}"] += r_peaks
+            peaks_counts[f"falling_{self.downstream_lib}"] += f_peaks
+            if self.args.stats_only:
+                continue
             print(f"\tPossible {tmp_df.shape[0]} positions for {self.cond_name} {self.wig_orient}")
             # Group overlaps and filter
             tmp_df = self.drop_overlaps(tmp_df, True if self.wig_orient == "r" else False)
@@ -45,13 +49,10 @@ class HybridAnnotator:
             # append
             tmp_df["seqid"] = seqid_key
             out_df = out_df.append(tmp_df, ignore_index=True)
-            peaks_counts[f"rising_{self.upstream_lib}"] += r_peaks
-            peaks_counts[f"falling_{self.downstream_lib}"] += f_peaks
-
         out_df.reset_index(inplace=True, drop=True)
         return out_df, peaks_counts
 
-    def generate_locs(self, coverage_array, is_reversed, cond_name, seqid, stats_only=False):
+    def generate_locs(self, coverage_array, is_reversed, cond_name, seqid):
         print(f"Generating all possible locations for: {cond_name} {seqid}{'R' if is_reversed else 'F'} ")
         if is_reversed:
             coverage_array = np.flipud(coverage_array)
@@ -70,15 +71,26 @@ class HybridAnnotator:
                                                         height=(None, None),
                                                         prominence=(None, None),
                                                         distance=self.args.peak_distance)
-        if stats_only:
-            return pd.DataFrame(), rising_peaks.shape[0], falling_peaks.shape[0]
         rp_index_func = lambda x: np.where(rising_peaks == x)
         fp_index_func = lambda x: np.where(falling_peaks == x)
+        r_ignore_coverage = self.args.ignore_coverage
+        f_ignore_coverage = self.args.ignore_coverage
+        up_cov_arr_no_zero = coverage_array[:, up_raw_coverage_col]
+        down_cov_arr_no_zero = coverage_array[:, down_raw_coverage_col]
+        if self.args.omit_zero_coverage:
+            up_cov_arr_no_zero = up_cov_arr_no_zero[up_cov_arr_no_zero > 0]
+            down_cov_arr_no_zero = down_cov_arr_no_zero[down_cov_arr_no_zero > 0]
+        if self.args.percentile_ignore_coverage:
+            r_ignore_coverage = np.percentile(up_cov_arr_no_zero, self.args.ignore_coverage)
+            f_ignore_coverage = np.percentile(down_cov_arr_no_zero, self.args.ignore_coverage)
         ## Ignore low coverage
         rising_peaks_list = \
-            [x for x in rising_peaks if coverage_array[x, up_raw_coverage_col] > self.args.ignore_coverage]
+            [x for x in rising_peaks if coverage_array[x, up_raw_coverage_col] > r_ignore_coverage]
         falling_peaks_list = \
-            [x for x in falling_peaks if coverage_array[x, down_raw_coverage_col] > self.args.ignore_coverage]
+            [x for x in falling_peaks if coverage_array[x, down_raw_coverage_col] > f_ignore_coverage]
+
+        if self.args.stats_only:
+            return pd.DataFrame(), len(rising_peaks_list), len(falling_peaks_list)
         falling_peaks_set = set(falling_peaks_list)
         strand = "-" if is_reversed else "+"
         possible_locs = []

@@ -34,10 +34,15 @@ def main():
                         help="Specify a name for the annotation type")
     parser.add_argument("--stats_only", default=False, action='store_true',
                         help="Causes the program to generate peak stats only, Ignores parameters")
-    parser.add_argument("--ignore_coverage", default=10, type=int,
-                        help="Ignore coverage up to")
+    parser.add_argument("--percentile_ignore_coverage", default=False, action='store_true',
+                        help="Causes the program to consider ignore_coverage parameter as percentile value")
+    parser.add_argument("--omit_zero_coverage", default=False, action='store_true',
+                        help="Causes the program to remove zeros before calculating the percentile")
     parser.add_argument("--gff_out", required=True, type=str, help="Path to output GFF file")
     args = parser.parse_args()
+    if args.percentile_ignore_coverage and args.ignore_coverage not in range(0, 101, 1):
+        print("Percentile value error, exit")
+        exit(1)
     logger.info("Getting list of files")
     refseq_paths = []
     for rs_item in args.refseqs_in:
@@ -70,9 +75,11 @@ def main():
         output[cond_name] = all_locs
     peaks_counts_str = "Peak_distance_param\tIgnore_coverage_param\tLibrary_type\tLibrary_name\tPeak count\n"
     for k, v in sum_peaks(peaks_counts).items():
-        lib_type = "rising" if "rising in k" else "falling"
-        lib_name = k.split("_", maxsplit=1).replace('_', ' ')
-        peaks_counts_str += f"{args.peak_distance}\t{args.ignore_coverage}\t{lib_type}\t{lib_name}\t{v}\n"
+        lib_type = "rising" if "rising" in k else "falling"
+        lib_name = k.split("_", maxsplit=1)[1].replace('_', ' ')
+        ig_cov = args.ignore_coverage if not args.percentile_ignore_coverage \
+            else f"{args.ignore_coverage}th percentile"
+        peaks_counts_str += f"{args.peak_distance}\t{ig_cov}\t{lib_type}\t{lib_name}\t{v}\n"
 
     # Export
     ## Stats
@@ -84,9 +91,10 @@ def main():
             if line not in unique_lines:
                 unique_lines.append(line)
     with open(f"{os.path.dirname(args.gff_out)}/stats.tsv", "w") as f:
-        f.write("\t".join(unique_lines))
+        f.write("".join(unique_lines))
     if args.stats_only:
         return None
+
     ## GFF
     all_cond_data = pd.DataFrame()
     all_cond_names = "_".join(output.keys())
