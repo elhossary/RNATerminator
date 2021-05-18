@@ -9,7 +9,7 @@ import sys
 import pandas as pd
 import pybedtools as pybed
 from io import StringIO
-
+from statistics import mean
 
 class HybridAnnotator:
 
@@ -31,15 +31,20 @@ class HybridAnnotator:
 
     def predict(self):
         out_df = pd.DataFrame()
-        peaks_counts = {f"rising_{self.upstream_lib}": 0, f"falling_{self.downstream_lib}": 0}
+        peaks_counts = {f"rising_{self.upstream_lib}": 0,
+                        f"falling_{self.downstream_lib}": 0}
+        cov_params = {f"rising_ignore_coverage_{self.upstream_lib}": [],
+                      f"falling_ignore_coverage_{self.downstream_lib}": []}
         for seqid_key in self.arr_dict.keys():
             # Generate location
-            tmp_df, r_peaks, f_peaks =\
+            tmp_df, r_peaks, f_peaks, r_ignore_coverage, f_ignore_coverage =\
                 self.generate_locs(self.arr_dict[seqid_key],
                                    True if self.wig_orient == "r" else False,
                                    self.cond_name, seqid_key)
             peaks_counts[f"rising_{self.upstream_lib}"] += r_peaks
             peaks_counts[f"falling_{self.downstream_lib}"] += f_peaks
+            cov_params[f"rising_ignore_coverage_{self.upstream_lib}"].append(r_ignore_coverage)
+            cov_params[f"falling_ignore_coverage_{self.downstream_lib}"].append(f_ignore_coverage)
             if self.args.stats_only:
                 continue
             print(f"\tPossible {tmp_df.shape[0]} positions for {self.cond_name} {self.wig_orient}")
@@ -50,7 +55,9 @@ class HybridAnnotator:
             tmp_df["seqid"] = seqid_key
             out_df = out_df.append(tmp_df, ignore_index=True)
         out_df.reset_index(inplace=True, drop=True)
-        return out_df, peaks_counts
+        for k in cov_params.keys():
+            cov_params[k] = mean(cov_params[k])
+        return out_df, peaks_counts, cov_params
 
     def generate_locs(self, coverage_array, is_reversed, cond_name, seqid):
         print(f"Generating all possible locations for: {cond_name} {seqid}{'R' if is_reversed else 'F'} ")
@@ -66,7 +73,6 @@ class HybridAnnotator:
                                                       height=(None, None),
                                                       prominence=(None, None),
                                                       distance=self.args.peak_distance)
-
         falling_peaks, falling_peaks_props = find_peaks(coverage_array[:, falling_col],
                                                         height=(None, None),
                                                         prominence=(None, None),
@@ -78,8 +84,8 @@ class HybridAnnotator:
         up_cov_arr_no_zero = coverage_array[:, up_raw_coverage_col]
         down_cov_arr_no_zero = coverage_array[:, down_raw_coverage_col]
         if self.args.omit_zero_coverage:
-            up_cov_arr_no_zero = up_cov_arr_no_zero[up_cov_arr_no_zero > 0]
-            down_cov_arr_no_zero = down_cov_arr_no_zero[down_cov_arr_no_zero > 0]
+            up_cov_arr_no_zero = up_cov_arr_no_zero[up_cov_arr_no_zero != 0]
+            down_cov_arr_no_zero = down_cov_arr_no_zero[down_cov_arr_no_zero != 0]
         if self.args.percentile_ignore_coverage:
             r_ignore_coverage = np.percentile(up_cov_arr_no_zero, self.args.ignore_coverage)
             f_ignore_coverage = np.percentile(down_cov_arr_no_zero, self.args.ignore_coverage)
@@ -90,7 +96,7 @@ class HybridAnnotator:
             [x for x in falling_peaks if coverage_array[x, down_raw_coverage_col] > f_ignore_coverage]
 
         if self.args.stats_only:
-            return pd.DataFrame(), len(rising_peaks_list), len(falling_peaks_list)
+            return pd.DataFrame(), len(rising_peaks_list), len(falling_peaks_list), r_ignore_coverage, f_ignore_coverage
         falling_peaks_set = set(falling_peaks_list)
         strand = "-" if is_reversed else "+"
         possible_locs = []
@@ -131,7 +137,7 @@ class HybridAnnotator:
         possible_locs_df["end"] = possible_locs_df["end"].astype(int)
         possible_locs_df["position_length"] = possible_locs_df["position_length"].astype(int)
         return self.drop_redundant_positions(possible_locs_df, is_reversed),\
-               rising_peaks.shape[0], falling_peaks.shape[0]
+               rising_peaks.shape[0], falling_peaks.shape[0], r_ignore_coverage, f_ignore_coverage
 
     def drop_redundant_positions(self, df, is_reversed):
         sort_key = "end"

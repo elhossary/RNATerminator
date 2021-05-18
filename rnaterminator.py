@@ -1,5 +1,5 @@
 import os.path
-
+from statistics import mean
 from rnaterminator_libs.hybrid_annotator import HybridAnnotator
 from rnaterminator_libs.annotation_exporter import AnnotationExporter
 from rnaterminator_libs.annotations_merger import AnnotationsMerger
@@ -53,6 +53,7 @@ def main():
     conditions_names = parsed_wig_paths_df["condition_name"].unique().tolist()
     output = {}
     peaks_counts = {}
+    cov_params = {}
     for cond_name in conditions_names:
         cond_df = parsed_wig_paths_df[parsed_wig_paths_df["condition_name"] == cond_name]
         all_locs = pd.DataFrame()
@@ -70,16 +71,31 @@ def main():
             for wig in wiggles_processed:
                 all_locs = all_locs.append(wig[0], ignore_index=True)
                 peaks_counts.update(wig[1])
+                cov_params.update(wig[2])
             all_locs.reset_index(inplace=True, drop=True)
             wig_pool.close()
         output[cond_name] = all_locs
-    peaks_counts_str = "Peak_distance_param\tIgnore_coverage_param\tLibrary_type\tLibrary_name\tPeak count\n"
+    peaks_counts_str = "Peak_distance_param\tIgnore_coverage_param\tLibrary_type\tLibrary_name\tPeak_count\n"
+    if args.percentile_ignore_coverage:
+        peaks_counts_str = \
+            "Peak_distance_param\tIgnore_coverage_percentile_param\tIgnore_coverage_ave_score\tLibrary_type\tLibrary_name\tPeak_count\n"
+    cov_params = mean_params(cov_params)
     for k, v in sum_peaks(peaks_counts).items():
+
         lib_type = "rising" if "rising" in k else "falling"
-        lib_name = k.split("_", maxsplit=1)[1].replace('_', ' ')
+        lib_name = k.split("_", maxsplit=1)[1]
         ig_cov = args.ignore_coverage if not args.percentile_ignore_coverage \
-            else f"{args.ignore_coverage}th percentile"
-        peaks_counts_str += f"{args.peak_distance}\t{ig_cov}\t{lib_type}\t{lib_name}\t{v}\n"
+            else f"{args.ignore_coverage}"
+        if args.percentile_ignore_coverage:
+            percentile_score = 0
+            for param_k in cov_params.keys():
+                if lib_type in param_k and lib_name in param_k:
+                    percentile_score = cov_params[param_k]
+                    break
+            peaks_counts_str += \
+                f"{args.peak_distance}\t{ig_cov}\t{percentile_score}\t{lib_type}\t{lib_name.replace('_', ' ')}\t{v}\n"
+        else:
+            peaks_counts_str += f"{args.peak_distance}\t{ig_cov}\t{lib_type}\t{lib_name.replace('_', ' ')}\t{v}\n"
 
     # Export
     ## Stats
@@ -114,8 +130,8 @@ def main():
 def process_single_wiggle(up_wig_path, down_wig_path, cond_name, refseq_paths, args):
     peak_annotator_obj = HybridAnnotator(up_wig_path=up_wig_path, down_wig_path=down_wig_path,
                                          cond_name=cond_name, refseq_paths=refseq_paths, args=args)
-    peaks_df, peaks_counts = peak_annotator_obj.predict()
-    return peaks_df, peaks_counts
+    peaks_df, peaks_counts, cov_params = peak_annotator_obj.predict()
+    return peaks_df, peaks_counts, cov_params
 
 
 def sum_peaks(in_dict):
@@ -127,6 +143,18 @@ def sum_peaks(in_dict):
         for i in in_dict.keys():
             if k in i:
                 out_dict[k] += in_dict[i]
+    return out_dict
+
+def mean_params(in_dict):
+    out_dict = {}
+    keys = set([x.replace("_forward", "").replace("_reverse", "") for x in in_dict.keys()])
+    for k in keys:
+        if k not in out_dict.keys():
+            out_dict[k] = []
+        for i in in_dict.keys():
+            if k in i:
+                out_dict[k].append(in_dict[i])
+        out_dict[k] = mean(out_dict[k])
     return out_dict
 
 def parse_wig_paths(wigs_paths):
@@ -142,7 +170,4 @@ def parse_wig_paths(wigs_paths):
         for wi in w[-1]:
             wig_info_extended.append([wi, w[1], w[2], w[3]])
     return pd.DataFrame(data=wig_info_extended, columns=["path", "condition_name", "wig_type", "orientation"])
-
-
-
 main()
