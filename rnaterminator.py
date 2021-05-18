@@ -32,6 +32,10 @@ def main():
                         help="Ignore coverage up to")
     parser.add_argument("--annotation_type", required=True, type=str,
                         help="Specify a name for the annotation type")
+    parser.add_argument("--stats_only", default=False, action='store_true',
+                        help="Causes the program to generate peak stats only, Ignores parameters")
+    parser.add_argument("--ignore_coverage", default=10, type=int,
+                        help="Ignore coverage up to")
     parser.add_argument("--gff_out", required=True, type=str, help="Path to output GFF file")
     args = parser.parse_args()
     logger.info("Getting list of files")
@@ -64,12 +68,26 @@ def main():
             all_locs.reset_index(inplace=True, drop=True)
             wig_pool.close()
         output[cond_name] = all_locs
-    peaks_counts_str = "Lib\tPeak count\n"
+    peaks_counts_str = "Peak_distance_param\tIgnore_coverage_param\tLibrary_type\tLibrary_name\tPeak count\n"
     for k, v in sum_peaks(peaks_counts).items():
-        peaks_counts_str += f"{k.replace('_', ' ')}\t{v}\n"
+        lib_type = "rising" if "rising in k" else "falling"
+        lib_name = k.split("_", maxsplit=1).replace('_', ' ')
+        peaks_counts_str += f"{args.peak_distance}\t{args.ignore_coverage}\t{lib_type}\t{lib_name}\t{v}\n"
+
     # Export
-    with open(f"{os.path.dirname(args.gff_out)}/stats.csv", "w") as f:
+    ## Stats
+    with open(f"{os.path.dirname(args.gff_out)}/stats.tsv", "a") as f:
         f.write(peaks_counts_str)
+    unique_lines = []
+    with open(f"{os.path.dirname(args.gff_out)}/stats.tsv", "r") as f:
+        for line in f.readlines():
+            if line not in unique_lines:
+                unique_lines.append(line)
+    with open(f"{os.path.dirname(args.gff_out)}/stats.tsv", "w") as f:
+        f.write("\t".join(unique_lines))
+    if args.stats_only:
+        return None
+    ## GFF
     all_cond_data = pd.DataFrame()
     all_cond_names = "_".join(output.keys())
     for k, v in output.items():

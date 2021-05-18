@@ -51,7 +51,7 @@ class HybridAnnotator:
         out_df.reset_index(inplace=True, drop=True)
         return out_df, peaks_counts
 
-    def generate_locs(self, coverage_array, is_reversed, cond_name, seqid):
+    def generate_locs(self, coverage_array, is_reversed, cond_name, seqid, stats_only=False):
         print(f"Generating all possible locations for: {cond_name} {seqid}{'R' if is_reversed else 'F'} ")
         if is_reversed:
             coverage_array = np.flipud(coverage_array)
@@ -70,7 +70,8 @@ class HybridAnnotator:
                                                         height=(None, None),
                                                         prominence=(None, None),
                                                         distance=self.args.peak_distance)
-
+        if stats_only:
+            return pd.DataFrame(), rising_peaks.shape[0], falling_peaks.shape[0]
         rp_index_func = lambda x: np.where(rising_peaks == x)
         fp_index_func = lambda x: np.where(falling_peaks == x)
         ## Ignore low coverage
