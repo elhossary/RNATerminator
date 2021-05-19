@@ -41,6 +41,8 @@ class HybridAnnotator:
                 self.generate_locs(self.arr_dict[seqid_key],
                                    True if self.wig_orient == "r" else False,
                                    self.cond_name, seqid_key)
+            if f_peaks == 0 or r_peaks == 0:
+                continue
             peaks_counts[f"rising_{self.upstream_lib}"] += r_peaks
             peaks_counts[f"falling_{self.downstream_lib}"] += f_peaks
             cov_params[f"rising_ignore_coverage_{self.upstream_lib}"].append(r_ignore_coverage)
@@ -86,6 +88,8 @@ class HybridAnnotator:
         if self.args.omit_zero_coverage:
             up_cov_arr_no_zero = up_cov_arr_no_zero[up_cov_arr_no_zero != 0]
             down_cov_arr_no_zero = down_cov_arr_no_zero[down_cov_arr_no_zero != 0]
+        if up_cov_arr_no_zero.size == 0 or down_cov_arr_no_zero.size == 0:
+            return pd.DataFrame(), 0, 0, 0, 0
         if self.args.percentile_ignore_coverage:
             r_ignore_coverage = np.percentile(up_cov_arr_no_zero, self.args.ignore_coverage)
             f_ignore_coverage = np.percentile(down_cov_arr_no_zero, self.args.ignore_coverage)
