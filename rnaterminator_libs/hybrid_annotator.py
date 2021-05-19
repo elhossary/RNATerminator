@@ -58,7 +58,10 @@ class HybridAnnotator:
             out_df = out_df.append(tmp_df, ignore_index=True)
         out_df.reset_index(inplace=True, drop=True)
         for k in cov_params.keys():
-            cov_params[k] = mean(cov_params[k])
+            if len(cov_params[k]) == 0:
+                cov_params[k] = 1
+            else:
+                cov_params[k] = mean(cov_params[k])
         return out_df, peaks_counts, cov_params
 
     def generate_locs(self, coverage_array, is_reversed, cond_name, seqid):
