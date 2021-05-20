@@ -31,22 +31,19 @@ class HybridAnnotator:
 
     def predict(self):
         out_df = pd.DataFrame()
-        peaks_counts = {f"rising_{self.upstream_lib}": 0,
-                        f"falling_{self.downstream_lib}": 0}
-        cov_params = {f"rising_ignore_coverage_{self.upstream_lib}": [],
-                      f"falling_ignore_coverage_{self.downstream_lib}": []}
+        peaks_cov = {f"rising_peaks_coverage_{self.upstream_lib}": [],
+                     f"falling_peaks_coverage_{self.downstream_lib}": []}
+        peaks_counts_per_score = []
         for seqid_key in self.arr_dict.keys():
             # Generate location
-            tmp_df, r_peaks, f_peaks, r_ignore_coverage, f_ignore_coverage =\
-                self.generate_locs(self.arr_dict[seqid_key],
+            generate_locs_return = self.generate_locs(self.arr_dict[seqid_key],
                                    True if self.wig_orient == "r" else False,
                                    self.cond_name, seqid_key)
-            if f_peaks == 0 or r_peaks == 0:
-                continue
-            peaks_counts[f"rising_{self.upstream_lib}"] += r_peaks
-            peaks_counts[f"falling_{self.downstream_lib}"] += f_peaks
-            cov_params[f"rising_ignore_coverage_{self.upstream_lib}"].append(r_ignore_coverage)
-            cov_params[f"falling_ignore_coverage_{self.downstream_lib}"].append(f_ignore_coverage)
+            tmp_df = generate_locs_return[0]
+            peaks_counts_per_score.extend(generate_locs_return[1])
+            peaks_cov[f"rising_peaks_coverage_{self.upstream_lib}"].extend(generate_locs_return[2])
+            peaks_cov[f"falling_peaks_coverage_{self.downstream_lib}"].extend(generate_locs_return[3])
+
             if self.args.stats_only:
                 continue
             print(f"\tPossible {tmp_df.shape[0]} positions for {self.cond_name} {self.wig_orient}")
@@ -56,13 +53,10 @@ class HybridAnnotator:
             # append
             tmp_df["seqid"] = seqid_key
             out_df = out_df.append(tmp_df, ignore_index=True)
+        for i in peaks_counts_per_score:
+            print(i)
         out_df.reset_index(inplace=True, drop=True)
-        for k in cov_params.keys():
-            if len(cov_params[k]) == 0:
-                cov_params[k] = 1
-            else:
-                cov_params[k] = mean(cov_params[k])
-        return out_df, peaks_counts, cov_params
+        return out_df, peaks_counts_per_score, peaks_cov
 
     def generate_locs(self, coverage_array, is_reversed, cond_name, seqid):
         print(f"Generating all possible locations for: {cond_name} {seqid}{'R' if is_reversed else 'F'} ")
@@ -82,28 +76,51 @@ class HybridAnnotator:
                                                         height=(None, None),
                                                         prominence=(None, None),
                                                         distance=self.args.peak_distance)
+        rising_peaks_coverages = [coverage_array[x + 3, up_raw_coverage_col] for x in rising_peaks]
+        falling_peaks_coverages = [coverage_array[x - 3, down_raw_coverage_col] for x in falling_peaks]
+
         rp_index_func = lambda x: np.where(rising_peaks == x)
         fp_index_func = lambda x: np.where(falling_peaks == x)
-        r_ignore_coverage = self.args.ignore_coverage
-        f_ignore_coverage = self.args.ignore_coverage
-        up_cov_arr_no_zero = coverage_array[:, up_raw_coverage_col]
-        down_cov_arr_no_zero = coverage_array[:, down_raw_coverage_col]
-        if self.args.omit_zero_coverage:
-            up_cov_arr_no_zero = up_cov_arr_no_zero[up_cov_arr_no_zero != 0]
-            down_cov_arr_no_zero = down_cov_arr_no_zero[down_cov_arr_no_zero != 0]
-        if up_cov_arr_no_zero.size == 0 or down_cov_arr_no_zero.size == 0:
-            return pd.DataFrame(), 0, 0, 0, 0
-        if self.args.percentile_ignore_coverage:
-            r_ignore_coverage = np.percentile(up_cov_arr_no_zero, self.args.ignore_coverage)
-            f_ignore_coverage = np.percentile(down_cov_arr_no_zero, self.args.ignore_coverage)
         ## Ignore low coverage
+        peaks_counts_per_score = []
+        if self.args.ignore_coverage_file is not None:
+            multi_ignore_coverage_df = pd.read_csv(os.path.abspath(self.args.ignore_coverage_file), sep="\t")
+            multi_ignore_coverage_df.drop_duplicates(inplace=True)
+            unstranded_upstream_lib = self.upstream_lib.rsplit("_", maxsplit=1)[0]
+            unstranded_downstream_lib = self.downstream_lib.rsplit("_", maxsplit=1)[0]
+            rising_params_df = multi_ignore_coverage_df[multi_ignore_coverage_df["lib"] == unstranded_upstream_lib]
+            falling_params_df = multi_ignore_coverage_df[multi_ignore_coverage_df["lib"] == unstranded_downstream_lib]
+            for i in rising_params_df.index:
+                rising_peaks_list = \
+                    [x for x in rising_peaks
+                     if coverage_array[x + 3, up_raw_coverage_col] > rising_params_df.at[i, "score"]]
+                peaks_counts_per_score.append(["rising",
+                                               self.upstream_lib,
+                                               rising_params_df.at[i, "percentile"],
+                                               rising_params_df.at[i, "score"],
+                                               len(rising_peaks_list)])
+
+            for i in falling_params_df.index:
+                falling_peaks_list = \
+                    [x for x in falling_peaks
+                     if coverage_array[x - 3, down_raw_coverage_col] > falling_params_df.at[i, "score"]]
+                peaks_counts_per_score.append(["falling",
+                                               self.downstream_lib,
+                                               falling_params_df.at[i, "percentile"],
+                                               falling_params_df.at[i, "score"],
+                                               len(falling_peaks_list)])
+            return pd.DataFrame(), peaks_counts_per_score, rising_peaks_coverages, falling_peaks_coverages
         rising_peaks_list = \
-            [x for x in rising_peaks if coverage_array[x, up_raw_coverage_col] > r_ignore_coverage]
+            [x for x in rising_peaks if coverage_array[x + 3, up_raw_coverage_col] > self.args.ignore_coverage]
+        peaks_counts_per_score.append(
+            ["rising", self.upstream_lib, "NA", self.args.ignore_coverage, len(rising_peaks_list)])
         falling_peaks_list = \
-            [x for x in falling_peaks if coverage_array[x, down_raw_coverage_col] > f_ignore_coverage]
+            [x for x in falling_peaks if coverage_array[x - 3, down_raw_coverage_col] > self.args.ignore_coverage]
+        peaks_counts_per_score.append(
+            ["falling", self.downstream_lib, "NA", self.args.ignore_coverage, len(falling_peaks_list)])
 
         if self.args.stats_only:
-            return pd.DataFrame(), len(rising_peaks_list), len(falling_peaks_list), r_ignore_coverage, f_ignore_coverage
+            return pd.DataFrame(), peaks_counts_per_score, rising_peaks_coverages, falling_peaks_coverages
         falling_peaks_set = set(falling_peaks_list)
         strand = "-" if is_reversed else "+"
         possible_locs = []
@@ -144,7 +161,7 @@ class HybridAnnotator:
         possible_locs_df["end"] = possible_locs_df["end"].astype(int)
         possible_locs_df["position_length"] = possible_locs_df["position_length"].astype(int)
         return self.drop_redundant_positions(possible_locs_df, is_reversed),\
-               rising_peaks.shape[0], falling_peaks.shape[0], r_ignore_coverage, f_ignore_coverage
+               rising_peaks.shape[0], falling_peaks.shape[0], rising_peaks_coverages, falling_peaks_coverages
 
     def drop_redundant_positions(self, df, is_reversed):
         sort_key = "end"
