@@ -91,7 +91,8 @@ class HybridAnnotator:
                 rising_peaks_list = \
                     [x for x in rising_peaks
                      if coverage_array[x + 3, up_raw_coverage_col] > rising_params_df.at[i, "score"]]
-                peaks_counts_per_score.append(["rising",
+                if len(rising_peaks_list) != 0:
+                    peaks_counts_per_score.append(["rising",
                                                self.upstream_lib,
                                                rising_params_df.at[i, "percentile"],
                                                rising_params_df.at[i, "score"],
@@ -101,11 +102,14 @@ class HybridAnnotator:
                 falling_peaks_list = \
                     [x for x in falling_peaks
                      if coverage_array[x - 3, down_raw_coverage_col] > falling_params_df.at[i, "score"]]
-                peaks_counts_per_score.append(["falling",
-                                               self.downstream_lib,
-                                               falling_params_df.at[i, "percentile"],
-                                               falling_params_df.at[i, "score"],
-                                               len(falling_peaks_list)])
+                if len(falling_peaks_list) != 0:
+                    peaks_counts_per_score.append(["falling",
+                                                   self.downstream_lib,
+                                                   falling_params_df.at[i, "percentile"],
+                                                   falling_params_df.at[i, "score"],
+                                                   len(falling_peaks_list)])
+                else:
+                    peaks_counts_per_score = peaks_counts_per_score[:-1]
             return pd.DataFrame(), peaks_counts_per_score, rising_peaks_coverages, falling_peaks_coverages
         rising_peaks_list = \
             [x for x in rising_peaks if coverage_array[x + 3, up_raw_coverage_col] > self.args.ignore_coverage]
