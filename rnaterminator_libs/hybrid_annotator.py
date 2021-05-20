@@ -43,7 +43,6 @@ class HybridAnnotator:
             peaks_counts_per_score.extend(generate_locs_return[1])
             peaks_cov[f"rising_peaks_coverage_{self.upstream_lib}"].extend(generate_locs_return[2])
             peaks_cov[f"falling_peaks_coverage_{self.downstream_lib}"].extend(generate_locs_return[3])
-
             if self.args.stats_only:
                 continue
             print(f"\tPossible {tmp_df.shape[0]} positions for {self.cond_name} {self.wig_orient}")
@@ -53,8 +52,6 @@ class HybridAnnotator:
             # append
             tmp_df["seqid"] = seqid_key
             out_df = out_df.append(tmp_df, ignore_index=True)
-        for i in peaks_counts_per_score:
-            print(i)
         out_df.reset_index(inplace=True, drop=True)
         return out_df, peaks_counts_per_score, peaks_cov
 
