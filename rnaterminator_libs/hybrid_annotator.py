@@ -91,8 +91,7 @@ class HybridAnnotator:
                 rising_peaks_list = \
                     [x for x in rising_peaks
                      if coverage_array[x + 3, up_raw_coverage_col] > rising_params_df.at[i, "score"]]
-                if len(rising_peaks_list) != 0:
-                    peaks_counts_per_score.append(["rising",
+                peaks_counts_per_score.append(["rising",
                                                self.upstream_lib,
                                                rising_params_df.at[i, "percentile"],
                                                rising_params_df.at[i, "score"],
@@ -102,14 +101,11 @@ class HybridAnnotator:
                 falling_peaks_list = \
                     [x for x in falling_peaks
                      if coverage_array[x - 3, down_raw_coverage_col] > falling_params_df.at[i, "score"]]
-                if len(falling_peaks_list) != 0:
-                    peaks_counts_per_score.append(["falling",
-                                                   self.downstream_lib,
-                                                   falling_params_df.at[i, "percentile"],
-                                                   falling_params_df.at[i, "score"],
-                                                   len(falling_peaks_list)])
-                else:
-                    peaks_counts_per_score = peaks_counts_per_score[:-1]
+                peaks_counts_per_score.append(["falling",
+                                               self.downstream_lib,
+                                               falling_params_df.at[i, "percentile"],
+                                               falling_params_df.at[i, "score"],
+                                               len(falling_peaks_list)])
             return pd.DataFrame(), peaks_counts_per_score, rising_peaks_coverages, falling_peaks_coverages
         rising_peaks_list = \
             [x for x in rising_peaks if coverage_array[x + 3, up_raw_coverage_col] > self.args.ignore_coverage]
@@ -161,8 +157,8 @@ class HybridAnnotator:
         possible_locs_df["start"] = possible_locs_df["start"].astype(int)
         possible_locs_df["end"] = possible_locs_df["end"].astype(int)
         possible_locs_df["position_length"] = possible_locs_df["position_length"].astype(int)
-        return self.drop_redundant_positions(possible_locs_df, is_reversed),\
-               rising_peaks.shape[0], falling_peaks.shape[0], rising_peaks_coverages, falling_peaks_coverages
+        return self.drop_redundant_positions(possible_locs_df, is_reversed), \
+               peaks_counts_per_score, rising_peaks_coverages, falling_peaks_coverages
 
     def drop_redundant_positions(self, df, is_reversed):
         sort_key = "end"
