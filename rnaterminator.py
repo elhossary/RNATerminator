@@ -81,7 +81,7 @@ def main():
         peaks_cov = combine_peaks_cov(peaks_cov)
         for k in peaks_cov.keys():
             print(f"Generating coverage peaks percentiles for: {k}")
-            peaks_cov[k] = [(x, percentile(peaks_cov[k], x)) for x in range(0, 100, 1)]
+            peaks_cov[k] = [(x, percentile(peaks_cov[k], x)) for x in range(0, 101, 1)]
         peaks_perc_df = peaks_dict_to_df(peaks_cov)
         peaks_perc_df.to_csv(f"{os.path.dirname(args.gff_out)}/percentiles.tsv", index=False, sep="\t", header=True)
     peaks_counts_df = combine_peaks_counts(peaks_counts)
