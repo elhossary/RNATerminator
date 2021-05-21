@@ -33,6 +33,8 @@ def main():
                         help="Parallel file processors")
     parser.add_argument("--ignore_coverage", default=10, type=int,
                         help="Ignore coverage up to")
+    parser.add_argument("--select_percentile", default=None, type=int,
+                        help="Ignore coverage up to")
     parser.add_argument("--ignore_coverage_file", default=None, type=str,
                         help="Ignore coverage up to values mentioned in TSV file per lib")
     parser.add_argument("--annotation_type", required=True, type=str,

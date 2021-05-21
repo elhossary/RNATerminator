@@ -85,8 +85,17 @@ class HybridAnnotator:
             multi_ignore_coverage_df.drop_duplicates(inplace=True)
             unstranded_upstream_lib = self.upstream_lib.rsplit("_", maxsplit=1)[0]
             unstranded_downstream_lib = self.downstream_lib.rsplit("_", maxsplit=1)[0]
-            rising_params_df = multi_ignore_coverage_df[multi_ignore_coverage_df["lib"] == unstranded_upstream_lib]
-            falling_params_df = multi_ignore_coverage_df[multi_ignore_coverage_df["lib"] == unstranded_downstream_lib]
+            if self.args.select_percentile is not None:
+                rising_params_df = multi_ignore_coverage_df[
+                    (multi_ignore_coverage_df["lib"] == unstranded_upstream_lib)
+                    & (multi_ignore_coverage_df["percentile"] == self.args.select_percentile)]
+                falling_params_df = multi_ignore_coverage_df[
+                    (multi_ignore_coverage_df["lib"] == unstranded_downstream_lib)
+                    & (multi_ignore_coverage_df["percentile"] == self.args.select_percentile)]
+            else:
+                rising_params_df = multi_ignore_coverage_df[multi_ignore_coverage_df["lib"] == unstranded_upstream_lib]
+                falling_params_df = multi_ignore_coverage_df[multi_ignore_coverage_df["lib"] == unstranded_downstream_lib]
+
             for i in rising_params_df.index:
                 rising_peaks_list = \
                     [x for x in rising_peaks
