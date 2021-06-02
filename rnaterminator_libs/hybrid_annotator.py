@@ -115,7 +115,6 @@ class HybridAnnotator:
                                                falling_params_df.at[i, "percentile"],
                                                falling_params_df.at[i, "score"],
                                                len(falling_peaks_list)])
-            return pd.DataFrame(), peaks_counts_per_score, rising_peaks_coverages, falling_peaks_coverages
         rising_peaks_list = \
             [x for x in rising_peaks if coverage_array[x + 3, up_raw_coverage_col] > self.args.ignore_coverage]
         peaks_counts_per_score.append(
@@ -234,14 +233,12 @@ class HybridAnnotator:
         down_wig_df = down_wig_df.loc[:, wig_cols]
         up_wig_df["score"] = up_wig_df["score"].abs()
         down_wig_df["score"] = down_wig_df["score"].abs()
-
         merged_df = reduce(lambda x, y: pd.merge(x, y, on=["variableStep_chrom", "location"], how='left'),
                            [up_wig_df.loc[:, wig_cols],
                             up_wig_obj.to_step_height(self.args.step_size, "start_end").loc[:, wig_cols],
                             down_wig_df.loc[:, wig_cols],
                             down_wig_obj.to_step_height(self.args.step_size, "end_start").loc[:, wig_cols]])
         merged_df["location"] = merged_df["location"].astype(int)
-
         for seqid in merged_df["variableStep_chrom"].unique():
             tmp_merged = merged_df[merged_df["variableStep_chrom"] == seqid].drop("variableStep_chrom", axis=1).copy()
             ret_arr = np.absolute(tmp_merged.to_numpy(copy=True))
